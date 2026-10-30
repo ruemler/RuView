@@ -1,0 +1,5 @@
+# Lokale Messdaten und Ergebnisse (CSI ist personenbezogen, ADR-299)
+aufnahmen/
+kalibrierung*.json
+ergebnis*.csv
+ergebnis*.png
