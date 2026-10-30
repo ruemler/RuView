@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Spectra Sense test rig
+
+- **Firmware: MAC filter before the CSI rate gate.** With `--filter-mac` set, frames from other transmitters used to consume the 50 Hz gate slot before being filtered, so a dedicated-transmitter link kept only the sender frames that happened to arrive first in each 20 ms window. The filter now runs first; host regression `make run_filter_gate` (SYNTHETIC). Not yet validated on hardware.
+- **`spectra-sense/`.** German setup guide and stdlib-only host tools for a first ESP32-S3-DevKitC-1 rig (FRITZ!Box AP on channel 6, one sender plus up to four receivers, optional HLK-LD2410 reference): config, flash/provision wrapper, live view and recorder, empty-room calibration and presence/motion evaluation, synthetic simulator and tests.
+
 
 ### Community batch (PRs #2100-#2157 by aepod, reviewed and integrated)
 

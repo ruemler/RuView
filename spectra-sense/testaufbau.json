@@ -1,0 +1,63 @@
+{
+  "netz": {
+    "ssid": "SpectraTest",
+    "passwort_datei": "~/.spectra-wlan-pass",
+    "kanal": 6,
+    "laptop_ip": "192.168.178.20",
+    "erlaubtes_netz": "192.168.178.0/24",
+    "udp_port": 5005
+  },
+  "link_modus": "ap",
+  "sender_mac": "",
+  "firmware": {
+    "build_verzeichnis": "../firmware/esp32-csi-node/build",
+    "flash_groesse": "8MB"
+  },
+  "auswertung": {
+    "fenster_s": 1.0,
+    "halte_s": 30.0,
+    "min_knoten": 1
+  },
+  "knoten": [
+    {
+      "name": "sender",
+      "node_id": 1,
+      "rolle": "sender",
+      "port": "/dev/ttyUSB0",
+      "position": "Raummitte, Tisch, 1 m Höhe",
+      "ld2410": false
+    },
+    {
+      "name": "empf-1",
+      "node_id": 11,
+      "rolle": "empfaenger",
+      "port": "/dev/ttyUSB1",
+      "position": "Ecke Fenster links, 1,5 m",
+      "ld2410": true
+    },
+    {
+      "name": "empf-2",
+      "node_id": 12,
+      "rolle": "empfaenger",
+      "port": "/dev/ttyUSB2",
+      "position": "Ecke Fenster rechts, 1,5 m",
+      "ld2410": false
+    },
+    {
+      "name": "empf-3",
+      "node_id": 13,
+      "rolle": "empfaenger",
+      "port": "/dev/ttyUSB3",
+      "position": "Ecke Tür links, 1,5 m",
+      "ld2410": true
+    },
+    {
+      "name": "empf-4",
+      "node_id": 14,
+      "rolle": "empfaenger",
+      "port": "/dev/ttyUSB4",
+      "position": "Ecke Tür rechts, 1,5 m",
+      "ld2410": false
+    }
+  ]
+}
