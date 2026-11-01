@@ -22,7 +22,7 @@ import auswertung  # noqa: E402
 import aufnahme  # noqa: E402
 import knoten  # noqa: E402
 import simulator  # noqa: E402
-from ssense import aufzeichnung, konfig, merkmale, protokoll  # noqa: E402
+from ssense import aufzeichnung, konfig, kurve, merkmale, messprotokoll, protokoll  # noqa: E402
 
 
 def still(fn, *args):
@@ -249,17 +249,26 @@ class UdpTest(unittest.TestCase):
             th.start()
             rc, out = still(aufnahme.main, ["--label", "test", "--dauer", "2.5", "--port",
                                             str(port), "--bind", "127.0.0.1", "--ausgabe", d,
-                                            "--ohne-anzeige"])
+                                            "--ohne-anzeige", "--raum", "labor",
+                                            "--personen", "1", "--notiz", "a,b"])
             stop.set()
             th.join(5)
             self.assertEqual(rc, 0, out)
-            dateien = os.listdir(d)
+            dateien = sorted(f for f in os.listdir(d) if f.endswith(".csi.jsonl"))
             self.assertEqual(len(dateien), 1)
+            zeilen = messprotokoll.lesen(os.path.join(d, "messprotokoll.csv"))
+            self.assertEqual(len(zeilen), 1)
+            z = zeilen[0]
+            self.assertEqual((z["datei"], z["raum"], z["label"], z["personen"], z["notiz"]),
+                             (dateien[0], "labor", "test", "1", "a,b"))
+            self.assertGreater(int(z["pakete"]), 0)
+            self.assertIn("empf-1:", z["knoten"])
             self.assertTrue(dateien[0].endswith("_test.csi.jsonl"))
             meta, pakete = aufzeichnung.lesen(os.path.join(d, dateien[0]))
             knoten_ids = {p["node"] for p in pakete if p["typ"] == "csi"}
             self.assertEqual(knoten_ids, {1, 11, 12, 13, 14})
             self.assertEqual(meta["kanal"], 6)
+            self.assertEqual((meta["raum"], meta["personen"]), ("labor", 1))
 
     def test_foreign_source_rejected(self):
         import ipaddress
@@ -267,6 +276,67 @@ class UdpTest(unittest.TestCase):
         self.assertTrue(aufnahme.quelle_erlaubt("192.168.178.31", netz))
         self.assertTrue(aufnahme.quelle_erlaubt("127.0.0.1", netz))
         self.assertFalse(aufnahme.quelle_erlaubt("10.0.0.5", netz))
+
+
+class MessprotokollTest(unittest.TestCase):
+    def test_header_once_and_append(self):
+        with tempfile.TemporaryDirectory() as d:
+            pfad = os.path.join(d, "unter", "messprotokoll.csv")
+            messprotokoll.eintragen(pfad, datei="a.csi.jsonl", start=0, label="leer", personen=0)
+            messprotokoll.eintragen(pfad, datei="b.csi.jsonl", label="gehen", personen=2,
+                                    notiz='Komma, "Zitat"')
+            with open(pfad, encoding="utf-8") as f:
+                self.assertEqual(f.read().count("datei,start"), 1)
+            zeilen = messprotokoll.lesen(pfad)
+            self.assertEqual([z["datei"] for z in zeilen], ["a.csi.jsonl", "b.csi.jsonl"])
+            self.assertEqual(zeilen[1]["notiz"], 'Komma, "Zitat"')
+            self.assertRegex(zeilen[0]["start"], r"^\d{4}-\d{2}-\d{2} ")
+
+    def test_unknown_column_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(ValueError):
+                messprotokoll.eintragen(os.path.join(d, "p.csv"), passwort="x")
+
+
+class KurveTest(unittest.TestCase):
+    def test_ring_buffer_drops_old_points(self):
+        v = kurve.Verlauf(sekunden=10)
+        for t in range(25):
+            v.add(11, float(t), 0.01 * t, -50)
+        x, idx, rssi = v.reihe(11, 24.0)
+        self.assertEqual(len(x), 11)
+        self.assertEqual(x[0], -10.0)
+        self.assertEqual(x[-1], 0.0)
+        self.assertEqual(rssi[-1], -50)
+
+    def test_missing_index_is_nan(self):
+        v = kurve.Verlauf()
+        v.add(1, 0.0, None, None)
+        _, idx, rssi = v.reihe(1, 0.0)
+        self.assertNotEqual(idx[0], idx[0])
+        self.assertNotEqual(rssi[0], rssi[0])
+
+    def test_draws_headless(self):
+        try:
+            import matplotlib
+        except ImportError:
+            self.skipTest("matplotlib nicht installiert")
+        matplotlib.use("Agg")
+        k = konfig.laden()
+        kv = kurve.Kurve(konfig.knoten_nach_id(k), {11: 0.02})
+        kv.starten()
+        for t in range(5):
+            kv.verlauf.add(11, float(t), 0.01, -48)
+        kv.zeichnen(4.0)
+        self.assertEqual(len(kv.linien[11][0].get_xdata()), 5)
+        kv._plt.close(kv.fig)
+
+
+class EinBoardTest(unittest.TestCase):
+    def test_one_board_config_valid(self):
+        k = konfig.laden(os.path.join(HIER, "testaufbau-1board.json"))
+        self.assertEqual(k["link_modus"], "ap")
+        self.assertEqual([n["rolle"] for n in k["knoten"]], ["empfaenger"])
 
 
 if __name__ == "__main__":
