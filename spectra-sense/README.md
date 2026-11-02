@@ -203,8 +203,17 @@ Speicherbedarf: etwa 280 MB pro Stunde bei 5 Knoten.
 
 Für die ersten Messungen reicht ein einzelnes ESP32-S3 als Empfänger; die
 FRITZ!Box ist dann die Quelle (`link_modus: "ap"`). Statt `testaufbau.json`
-die Datei `testaufbau-1board.json` verwenden und bei jedem Befehl
-`--konfig testaufbau-1board.json` anhängen. Boards mit eingebautem USB-Seriell-
+die Datei `testaufbau-1board.json` verwenden. Bei `knoten.py` steht
+`--konfig` **vor** dem Unterbefehl, bei `aufnahme.py` und `simulator.py`
+irgendwo:
+
+```bash
+python3 knoten.py --konfig testaufbau-1board.json ports
+python3 knoten.py --konfig testaufbau-1board.json flashen empf-1
+python3 knoten.py --konfig testaufbau-1board.json einrichten empf-1
+python3 aufnahme.py --konfig testaufbau-1board.json --nur-live --kurve
+```
+ Boards mit eingebautem USB-Seriell-
 Wandler (z. B. Waveshare ESP32-S3 N16R8) erscheinen meist als `/dev/ttyACM0`;
 den Port mit `python3 knoten.py ports` prüfen und in der Datei anpassen.
 Die PCB-Antenne reicht für Phase 1. Mit einem Board gibt es nur eine
