@@ -10,6 +10,9 @@ Beispiele:
 
   # Mit Kalibrierung: Live-Status frei / Bewegung / belegt
   python3 aufnahme.py --label gehen --dauer 60 --kalibrierung kalibrierung.json
+
+  # Mit Messprotokoll-Angaben und Live-Kurve (braucht python3-matplotlib)
+  python3 aufnahme.py --label gehen --dauer 60 --raum buero --personen 1 --kurve
 """
 
 import argparse
@@ -21,7 +24,7 @@ import sys
 import time
 from collections import defaultdict
 
-from ssense import aufzeichnung, konfig, merkmale, protokoll
+from ssense import aufzeichnung, konfig, kurve, merkmale, messprotokoll, protokoll
 
 LABELS = ("leer", "gehen", "sitzen", "stehen", "tuer", "gemischt", "test")
 
@@ -49,6 +52,7 @@ class Live:
         self.vitals = {}
         self.unbekannt = set()
         self.warnungen = set()
+        self.kurve = None                     # optional: kurve.Kurve
 
     def paket(self, t, pkt):
         node = pkt["node"]
@@ -67,6 +71,8 @@ class Live:
                 n, t_end, idx, _ = fertig
                 self.index[n] = idx
                 self.bewegung[n] = self.detector.update(n, t_end, idx)
+                if self.kurve is not None:
+                    self.kurve.verlauf.add(n, t_end, idx, self.rssi.get(n))
         else:
             self.vitals[node] = pkt
 
@@ -133,10 +139,21 @@ def main(argv=None):
     ap.add_argument("--bind", default="0.0.0.0", help="lokale Adresse (Standard alle)")
     ap.add_argument("--port", type=int, help="UDP-Port (Standard aus Konfig)")
     ap.add_argument("--ohne-anzeige", action="store_true", help="keine Live-Tabelle")
+    ap.add_argument("--kurve", action="store_true",
+                    help="Live-Kurve (Bewegungsindex, RSSI) in eigenem Fenster")
+    mp = ap.add_argument_group("Messprotokoll (eine Zeile pro Aufnahme)")
+    mp.add_argument("--raum", default="", help="z. B. buero, wohnzimmer")
+    mp.add_argument("--personen", type=int, help="Personen im Raum (0 bei leer)")
+    mp.add_argument("--tueren", choices=("offen", "zu", "gemischt"), default="zu")
+    mp.add_argument("--protokoll", help="CSV-Datei (Standard: <ausgabe>/messprotokoll.csv)")
     a = ap.parse_args(argv)
 
     if not a.nur_live and not a.label:
         ap.error("--label ist für Aufnahmen nötig (oder --nur-live verwenden)")
+    if a.personen is not None and a.personen < 0:
+        ap.error("--personen darf nicht negativ sein")
+    if a.personen is None and a.label == "leer":
+        a.personen = 0
 
     k = konfig.laden(a.konfig)
     netz = ipaddress.ip_network(k["netz"].get("erlaubtes_netz", "192.168.178.0/24"),
@@ -146,6 +163,14 @@ def main(argv=None):
     schwellen = lade_schwellen(a.kalibrierung) if a.kalibrierung else {}
     live = Live(k, schwellen, ausw.get("fenster_s", 1.0), ausw.get("halte_s", 30.0),
                 ausw.get("min_knoten", 1))
+    if a.kurve:
+        live.kurve = kurve.Kurve(live.namen, schwellen)
+        try:
+            live.kurve.starten()
+        except Exception as e:  # kein matplotlib oder kein Bildschirm
+            print("Live-Kurve nicht verfügbar (%s); weiter mit Tabelle. "
+                  "Abhilfe: sudo apt install python3-matplotlib" % e, file=sys.stderr)
+            live.kurve = None
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -180,6 +205,7 @@ def main(argv=None):
         pfad = os.path.join(a.ausgabe, name)
         schreiber = aufzeichnung.Schreiber(pfad, {
             "label": a.label, "notiz": a.notiz, "dauer_s": a.dauer,
+            "raum": a.raum, "personen": a.personen, "tueren": a.tueren,
             "link_modus": k["link_modus"], "kanal": k["netz"]["kanal"],
             "knoten": [{x: n.get(x) for x in ("name", "node_id", "rolle", "position", "ld2410")}
                        for n in k["knoten"]],
@@ -188,6 +214,7 @@ def main(argv=None):
 
     start = time.time()
     letzte_anzeige = start
+    letzte_kurve = start
     abgewiesen = 0
     try:
         while True:
@@ -218,6 +245,9 @@ def main(argv=None):
                 print("\033[2J\033[H" + kopf + "\n\n" + live.tabelle(jetzt, jetzt - letzte_anzeige),
                       flush=True)
                 letzte_anzeige = jetzt
+            if live.kurve is not None and jetzt - letzte_kurve >= 0.5:
+                live.kurve.zeichnen(jetzt)
+                letzte_kurve = jetzt
     except KeyboardInterrupt:
         print("\nabgebrochen")
     finally:
@@ -237,6 +267,15 @@ def main(argv=None):
         print("  %-8s node %3d: %6d CSI-Pakete (%.1f/s)%s" % (n["name"], nid, anz, anz / dauer, hinweis))
     if schreiber:
         print("gespeichert: %s (%d Zeilen)" % (schreiber.pfad, schreiber.zeilen))
+        protokoll_pfad = a.protokoll or os.path.join(a.ausgabe, "messprotokoll.csv")
+        messprotokoll.eintragen(
+            protokoll_pfad, datei=os.path.basename(schreiber.pfad), start=start,
+            dauer_s="%.0f" % dauer, raum=a.raum, label=a.label,
+            personen="" if a.personen is None else a.personen, tueren=a.tueren,
+            knoten="; ".join("%s: %s" % (n["name"], n.get("position", ""))
+                             for n in k["knoten"]),
+            pakete=sum(live.gesamt.values()), notiz=a.notiz)
+        print("Messprotokoll: %s" % protokoll_pfad)
     return 0
 
 

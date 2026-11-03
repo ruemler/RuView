@@ -47,8 +47,8 @@ def ziel_knoten(k, name):
     return [konfig.knoten_nach_name(k, name)]
 
 
-def port_pruefen(n, trocken):
-    port = n.get("port", "")
+def port_pruefen(n, trocken, override=None):
+    port = override or n.get("port", "")
     if trocken or os.path.exists(port):
         return port
     by_id, roh = serielle_ports()
@@ -123,7 +123,7 @@ def cmd_ports(k, a):
 
 def cmd_mac(k, a):
     n = konfig.knoten_nach_name(k, a.knoten)
-    port = port_pruefen(n, False)
+    port = port_pruefen(n, False, a.port)
     mac = mac_lesen(port)
     print("%s (%s): WLAN-STA-MAC %s" % (n["name"], port, mac))
     if a.speichern:
@@ -142,7 +142,7 @@ def cmd_mac(k, a):
 
 def cmd_flashen(k, a):
     for n in ziel_knoten(k, a.knoten):
-        port = port_pruefen(n, a.trocken)
+        port = port_pruefen(n, a.trocken, a.port)
         cmd, fehlend = flash_befehl(k, n, port)
         if fehlend and not a.trocken:
             print("Firmware fehlt: %s\nErst ./firmware_bauen.sh ausführen." % ", ".join(fehlend),
@@ -163,7 +163,7 @@ def cmd_einrichten(k, a):
               "nano %s" % (pw, pw, pw), file=sys.stderr)
         return 2
     for n in ziel_knoten(k, a.knoten):
-        port = port_pruefen(n, a.trocken)
+        port = port_pruefen(n, a.trocken, a.port)
         print("\n== %s (node_id %d, %s) einrichten ==" % (n["name"], n["node_id"], n["rolle"]))
         if ausfuehren(provision_befehl(k, n, port), a.trocken) != 0:
             print("Einrichten von %s fehlgeschlagen." % n["name"], file=sys.stderr)
@@ -176,6 +176,8 @@ def main(argv=None):
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--konfig", help="Pfad zu testaufbau.json")
     ap.add_argument("--trocken", action="store_true", help="Befehle nur anzeigen")
+    ap.add_argument("--port", help="seriellen Port aus der Konfig überschreiben, z. B. wenn "
+                    "die Boards nacheinander am selben USB-Anschluss geflasht werden")
     sub = ap.add_subparsers(dest="befehl", required=True)
     sub.add_parser("ports", help="serielle Ports anzeigen").set_defaults(fn=cmd_ports)
     m = sub.add_parser("mac", help="WLAN-MAC eines Knotens lesen")
@@ -189,6 +191,8 @@ def main(argv=None):
     e.add_argument("knoten", help="Knotenname oder 'alle'")
     e.set_defaults(fn=cmd_einrichten)
     a = ap.parse_args(argv)
+    if a.port and getattr(a, "knoten", None) == "alle":
+        ap.error("--port gilt für ein einzelnes Board, nicht für 'alle'")
     try:
         k = konfig.laden(a.konfig)
         return a.fn(k, a)

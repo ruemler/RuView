@@ -17,7 +17,8 @@ Inhalt:
 | `testaufbau.json` | **Die eine Stelle**, an der der Aufbau beschrieben wird (Netz, Knoten, Ports) |
 | `firmware_bauen.sh` | Baut die Firmware in Docker, richtige Variante für das DevKitC |
 | `knoten.py` | Ports anzeigen, Firmware flashen, WLAN/Laptop-IP/Knoten-ID einrichten |
-| `aufnahme.py` | Live-Tabelle aller Knoten und Aufnahme in `aufnahmen/*.csi.jsonl` |
+| `aufnahme.py` | Live-Tabelle aller Knoten, optional Live-Kurve (`--kurve`), Aufnahme in `aufnahmen/*.csi.jsonl` und eine Zeile im Messprotokoll |
+| `testaufbau-1board.json` | Variante für den Start mit nur einem Board (FRITZ!Box als Quelle) |
 | `auswertung.py` | Kalibrierung (leerer Raum) und Auswertung frei/belegt, CSV, Diagramm |
 | `simulator.py` | Synthetische Knoten zum Üben ohne Hardware |
 | `tests/` | Selbsttests (`python3 -m unittest discover -s tests`) |
@@ -134,6 +135,23 @@ Klappt das Flashen nicht: BOOT-Taste halten, RST kurz drücken, BOOT loslassen,
 nochmal. Einzelne Knoten gehen mit Namen statt `alle`, z. B.
 `python3 knoten.py einrichten empf-2`.
 
+**Boards nacheinander am selben USB-Anschluss:** Statt alle gleichzeitig am
+Hub geht auch eins nach dem anderen. Dann mit `--port` den gerade belegten
+Port angeben (`python3 knoten.py ports` zeigt ihn) und Board für Board
+flashen und einrichten, danach abstecken und beschriften:
+
+```bash
+python3 knoten.py --port /dev/ttyACM0 flashen sender
+python3 knoten.py --port /dev/ttyACM0 einrichten sender
+# nächstes Board anstecken
+python3 knoten.py --port /dev/ttyACM0 flashen empf-1
+python3 knoten.py --port /dev/ttyACM0 einrichten empf-1
+```
+
+Nach dem Einrichten brauchen die Boards nur noch Strom; die Daten kommen per
+WLAN. Einrichten setzt die fertige FRITZ!Box (Abschnitt 2), die Passwortdatei
+und `netz.laptop_ip` voraus; flashen geht schon vorher.
+
 ## 7. Erster Funktionstest
 
 Raum verlassen und alle Knoten **im leeren Raum** einschalten (die Firmware
@@ -180,7 +198,43 @@ Stellschrauben:
 Live mit Kalibrierung: `python3 aufnahme.py --nur-live --kalibrierung kalibrierung.json`
 zeigt pro Knoten `frei / BEWEGUNG / belegt` und den Raumstatus.
 
+**Live-Kurve:** `--kurve` öffnet zusätzlich ein Fenster mit Bewegungsindex
+und RSSI je Knoten über die letzten 60 s (gestrichelt: Schwelle aus der
+Kalibrierung). Braucht `python3-matplotlib`.
+
+**Messprotokoll:** Jede Aufnahme hängt eine Zeile an
+`aufnahmen/messprotokoll.csv` an (Datei, Startzeit, Dauer, Raum, Label,
+Personen, Türen, Knotenpositionen, Paketzahl, Notiz). Die Angaben kommen aus
+`--raum`, `--personen` (bei `leer` automatisch 0), `--tueren` und `--notiz`:
+
+```bash
+python3 aufnahme.py --label gehen --dauer 60 --vorlauf 5 \
+    --raum buero --personen 1 --tueren zu --notiz "Kreis um den Tisch" --kurve
+```
+
+Das Protokoll liegt wie die Aufnahmen nur lokal (gitignore).
+
 Speicherbedarf: etwa 280 MB pro Stunde bei 5 Knoten.
+
+## 8a. Mit nur einem Board starten
+
+Für die ersten Messungen reicht ein einzelnes ESP32-S3 als Empfänger; die
+FRITZ!Box ist dann die Quelle (`link_modus: "ap"`). Statt `testaufbau.json`
+die Datei `testaufbau-1board.json` verwenden. Bei `knoten.py` steht
+`--konfig` **vor** dem Unterbefehl, bei `aufnahme.py` und `simulator.py`
+irgendwo:
+
+```bash
+python3 knoten.py --konfig testaufbau-1board.json ports
+python3 knoten.py --konfig testaufbau-1board.json flashen empf-1
+python3 knoten.py --konfig testaufbau-1board.json einrichten empf-1
+python3 aufnahme.py --konfig testaufbau-1board.json --nur-live --kurve
+```
+ Boards mit eingebautem USB-Seriell-
+Wandler (z. B. Waveshare ESP32-S3 N16R8) erscheinen meist als `/dev/ttyACM0`;
+den Port mit `python3 knoten.py ports` prüfen und in der Datei anpassen.
+Die PCB-Antenne reicht für Phase 1. Mit einem Board gibt es nur eine
+Funkstrecke: Bewegung wird erkannt, eine Ortung im Raum nicht.
 
 ## 9. Sender-Modus (fester Sender statt FRITZ!Box als Quelle)
 
