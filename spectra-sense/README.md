@@ -135,6 +135,23 @@ Klappt das Flashen nicht: BOOT-Taste halten, RST kurz drücken, BOOT loslassen,
 nochmal. Einzelne Knoten gehen mit Namen statt `alle`, z. B.
 `python3 knoten.py einrichten empf-2`.
 
+**Boards nacheinander am selben USB-Anschluss:** Statt alle gleichzeitig am
+Hub geht auch eins nach dem anderen. Dann mit `--port` den gerade belegten
+Port angeben (`python3 knoten.py ports` zeigt ihn) und Board für Board
+flashen und einrichten, danach abstecken und beschriften:
+
+```bash
+python3 knoten.py --port /dev/ttyACM0 flashen sender
+python3 knoten.py --port /dev/ttyACM0 einrichten sender
+# nächstes Board anstecken
+python3 knoten.py --port /dev/ttyACM0 flashen empf-1
+python3 knoten.py --port /dev/ttyACM0 einrichten empf-1
+```
+
+Nach dem Einrichten brauchen die Boards nur noch Strom; die Daten kommen per
+WLAN. Einrichten setzt die fertige FRITZ!Box (Abschnitt 2), die Passwortdatei
+und `netz.laptop_ip` voraus; flashen geht schon vorher.
+
 ## 7. Erster Funktionstest
 
 Raum verlassen und alle Knoten **im leeren Raum** einschalten (die Firmware

@@ -141,6 +141,16 @@ class KnotenTest(unittest.TestCase):
         self.assertEqual(out.count("provision.py"), 5)
         self.assertLess(out.index("== sender"), out.index("== empf-1"))
 
+    def test_port_override_single_board(self):
+        rc, out = still(knoten.main, ["--trocken", "--port", "/dev/ttyACM0", "flashen", "empf-2"])
+        self.assertEqual(rc, 0)
+        self.assertIn("--port /dev/ttyACM0", out)
+        self.assertNotIn("ttyUSB2", out)
+
+    def test_port_override_rejected_for_all(self):
+        with self.assertRaises(SystemExit):
+            still(knoten.main, ["--trocken", "--port", "/dev/ttyACM0", "flashen", "alle"])
+
 
 class MerkmaleTest(unittest.TestCase):
     def test_threshold_needs_data(self):
