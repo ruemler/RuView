@@ -92,6 +92,7 @@ class KonfigTest(unittest.TestCase):
         self.fehler(lambda k: k["netz"].update(laptop_ip="8.8.8.8"))
         self.fehler(lambda k: k.update(link_modus="mesh"))
         self.fehler(lambda k: k.update(sender_mac="zz"))
+        self.fehler(lambda k: k.update(ap_mac="zz"))
         self.fehler(lambda k: k["knoten"][1].update(node_id=1))
         self.fehler(lambda k: k["knoten"][1].update(name="sender"))
         self.fehler(lambda k: k["knoten"][1].update(name="../x"))
@@ -106,14 +107,24 @@ class KnotenTest(unittest.TestCase):
     def setUp(self):
         self.k = konfig.laden()
 
-    def test_ap_mode_has_no_filter(self):
-        n = konfig.knoten_nach_name(self.k, "empf-1")
-        cmd = knoten.provision_befehl(self.k, n, "/dev/ttyUSB1")
+    def test_ap_mode_without_ap_mac_has_no_filter(self):
+        k = copy.deepcopy(self.k)
+        k["ap_mac"] = ""
+        n = konfig.knoten_nach_name(k, "empf-1")
+        cmd = knoten.provision_befehl(k, n, "/dev/ttyUSB1")
         self.assertIn("--password-file", cmd)
         self.assertNotIn("--password", cmd)
         self.assertNotIn("--filter-mac", cmd)
         self.assertEqual(cmd[cmd.index("--node-id") + 1], "11")
         self.assertIn("--reset", cmd)
+
+    def test_ap_mode_filters_all_nodes_with_ap_mac(self):
+        k = copy.deepcopy(self.k)
+        k["ap_mac"] = "aa:bb:cc:00:11:22"
+        konfig.pruefen(k)
+        for name in ("sender", "empf-1"):
+            cmd = knoten.provision_befehl(k, konfig.knoten_nach_name(k, name), "p")
+            self.assertEqual(cmd[cmd.index("--filter-mac") + 1], "AA:BB:CC:00:11:22")
 
     def test_sender_mode_filters_receivers_only(self):
         k = copy.deepcopy(self.k)
@@ -161,6 +172,20 @@ class MerkmaleTest(unittest.TestCase):
         base = [10.0 + i % 7 for i in range(64)]
         frames = [[a * (1.0 if j % 2 else 1.5) for a in base] for j in range(20)]
         self.assertLess(merkmale.motion_index(frames), 1e-9)
+
+    def test_windower_uses_main_frame_type_only(self):
+        # Ruhiger Raum, aber 1 von 5 Frames ist eine andere Frame-Art (64 statt
+        # 128 Subträger, anderes Profil). Gemischt waere der Index hoch.
+        haupt = [10.0 + (i % 9) for i in range(128)]
+        neben = [30.0 - (i % 5) * 4 for i in range(64)]
+        w = merkmale.Windower(1.0)
+        r = None
+        for j in range(80):
+            amps = neben if j % 5 == 0 else haupt
+            r = w.add(1, j * 0.03, list(amps)) or r
+        self.assertEqual(w.haupt_laenge(1), 128)
+        self.assertIsNotNone(r)
+        self.assertLess(r[2], 1e-9)
 
     def test_detector_hold(self):
         d = merkmale.Detector({1: 0.05}, halte_s=10)

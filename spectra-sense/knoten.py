@@ -93,6 +93,10 @@ def provision_befehl(k, n, port):
                 "link_modus 'sender' braucht sender_mac. Erst: python3 knoten.py mac "
                 "<sender-name> --speichern")
         cmd += ["--filter-mac", k["sender_mac"].upper()]
+    elif k["link_modus"] == "ap" and k.get("ap_mac"):
+        # Nur CSI von der FRITZ!Box auswerten. Ohne Filter mischt jedes Board
+        # Pakete aller Sender im Raum (auch der anderen Boards, je 50 Hz).
+        cmd += ["--filter-mac", k["ap_mac"].upper()]
     return cmd
 
 

@@ -236,6 +236,22 @@ den Port mit `python3 knoten.py ports` prüfen und in der Datei anpassen.
 Die PCB-Antenne reicht für Phase 1. Mit einem Board gibt es nur eine
 Funkstrecke: Bewegung wird erkannt, eine Ortung im Raum nicht.
 
+## 8b. Nur Pakete der FRITZ!Box auswerten (`ap_mac`)
+
+Im Modus `ap` hört jedes Board ohne Filter alle WLAN-Pakete im Raum mit, auch
+die der anderen Boards (die selbst ~50 Pakete/s senden). Jedes Paket kommt
+dann über einen anderen Funkweg, der Bewegungsindex ist schon im leeren Raum
+hoch und Bewegung geht darin unter. Abhilfe: die 2,4-GHz-BSSID der FRITZ!Box als
+Filter eintragen und alle Boards neu einrichten (kein neues Flashen nötig).
+
+```bash
+nmcli -f SSID,BSSID,CHAN dev wifi list | grep SpectraTest   # BSSID ablesen
+# in testaufbau.json: "ap_mac": "AA:BB:CC:DD:EE:FF"
+python3 knoten.py --port /dev/ttyACM0 einrichten sender     # je Board, danach RST
+```
+
+Danach neu kalibrieren: Eine Kalibrierung ohne Filter passt nicht mehr.
+
 ## 9. Sender-Modus (fester Sender statt FRITZ!Box als Quelle)
 
 Im Modus `ap` misst jeder Empfänger die Funkstrecke FRITZ!Box → Empfänger. Im

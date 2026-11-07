@@ -4,6 +4,10 @@ Verfahren (bewusst simpel und nachvollziehbar, kein trainiertes Modell):
 
 1. Jeder CSI-Frame wird auf seine mittlere Amplitude normiert. Das entfernt
    gemeinsame Pegelsprünge der ESP32-Verstärkungsregelung (AGC).
+   Pro Knoten zählt nur die häufigste Frame-Art (Anzahl Subträger, z. B. 128
+   bei HT20). Ein Board empfängt mehrere Arten (64/128/192) auch von
+   verschiedenen Sendern; gemischt würden sie den Index künstlich aufblähen
+   (gemessen 07.11.: Leerraum-Index ~0,18 statt ~0,03-0,15).
 2. Pro Knoten und Zeitfenster (Standard 1 s) wird je Subträger die
    Standardabweichung der normierten Amplitude berechnet und über die
    Subträger gemittelt: der "Bewegungsindex". Ruhiger Raum -> klein,
@@ -80,10 +84,26 @@ class Windower:
         self.fenster_s = fenster_s
         self._start = {}
         self._frames = {}
+        self._laengen = {}   # node -> {n_sub: Anzahl}, für die Haupt-Frame-Art
+
+    def haupt_laenge(self, node):
+        """Häufigste Frame-Länge (Subträger) eines Knotens bisher, sonst None."""
+        z = self._laengen.get(node)
+        if not z:
+            return None
+        return max(z.items(), key=lambda kv: (kv[1], kv[0]))[0]
+
+    def _index(self, node, frames):
+        laenge = self.haupt_laenge(node)
+        if laenge is not None:
+            frames = [f for f in frames if len(f) == laenge]
+        return motion_index(frames)
 
     def add(self, node, t, amps):
         """Frame hinzufügen; gibt (node, t_ende, index, n_frames) zurück, wenn
         dadurch ein Fenster abgeschlossen wurde, sonst None."""
+        z = self._laengen.setdefault(node, {})
+        z[len(amps)] = z.get(len(amps), 0) + 1
         start = self._start.get(node)
         if start is None:
             self._start[node] = t
@@ -93,7 +113,7 @@ class Windower:
             self._frames[node].append(amps)
             return None
         frames = self._frames[node]
-        result = (node, start + self.fenster_s, motion_index(frames), len(frames))
+        result = (node, start + self.fenster_s, self._index(node, frames), len(frames))
         # Bei Lücken das neue Fenster am aktuellen Frame beginnen.
         self._start[node] = start + self.fenster_s if t - start < 2 * self.fenster_s else t
         self._frames[node] = [amps]
