@@ -2,12 +2,14 @@
   "netz": {
     "ssid": "SpectraTest",
     "passwort_datei": "~/.spectra-wlan-pass",
+    "ota_psk_datei": "~/.spectra-ota-psk",
     "kanal": 6,
     "laptop_ip": "192.168.178.20",
     "erlaubtes_netz": "192.168.178.0/24",
     "udp_port": 5005
   },
   "link_modus": "ap",
+  "ap_mac": "38:10:D5:C9:CF:38",
   "sender_mac": "",
   "firmware": {
     "build_verzeichnis": "../firmware/esp32-csi-node/build",

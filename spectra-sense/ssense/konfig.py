@@ -48,6 +48,9 @@ def pruefen(k):
     mac = k.get("sender_mac", "")
     if mac and not MAC_RE.match(mac):
         raise KonfigFehler("sender_mac muss AA:BB:CC:DD:EE:FF sein")
+    ap_mac = k.get("ap_mac", "")
+    if ap_mac and not MAC_RE.match(ap_mac):
+        raise KonfigFehler("ap_mac muss AA:BB:CC:DD:EE:FF sein")
 
     knoten = k.get("knoten") or []
     if not knoten:
