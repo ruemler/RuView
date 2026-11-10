@@ -87,6 +87,11 @@ def provision_befehl(k, n, port):
            "--target-port", str(netz["udp_port"]),
            "--node-id", str(n["node_id"]),
            "--edge-tier", "2"]
+    psk = netz.get("ota_psk_datei")
+    if psk:
+        # Schlüssel für Fernkonfiguration/OTA (64 Hex-Zeichen, Datei chmod 600).
+        # Ohne ihn lehnt das Board jede Änderung über WLAN ab.
+        cmd += ["--ota-psk-file", konfig.pfad_relativ(k, psk)]
     if k["link_modus"] == "sender" and n["rolle"] == "empfaenger":
         if not k.get("sender_mac"):
             raise konfig.KonfigFehler(

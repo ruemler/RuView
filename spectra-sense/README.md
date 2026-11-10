@@ -252,6 +252,13 @@ python3 knoten.py --port /dev/ttyACM0 einrichten sender     # je Board, danach R
 
 Danach neu kalibrieren: Eine Kalibrierung ohne Filter passt nicht mehr.
 
+Schlüssel für die Fernkonfiguration über WLAN (einmalig anlegen, wird beim
+`einrichten` mitgeschrieben; nie ins Repo):
+
+```bash
+(umask 077; python3 -c "import secrets; print(secrets.token_hex(32))" > ~/.spectra-ota-psk)
+```
+
 ## 9. Sender-Modus (fester Sender statt FRITZ!Box als Quelle)
 
 Im Modus `ap` misst jeder Empfänger die Funkstrecke FRITZ!Box → Empfänger. Im

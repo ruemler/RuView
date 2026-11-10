@@ -126,6 +126,15 @@ class KnotenTest(unittest.TestCase):
             cmd = knoten.provision_befehl(k, konfig.knoten_nach_name(k, name), "p")
             self.assertEqual(cmd[cmd.index("--filter-mac") + 1], "AA:BB:CC:00:11:22")
 
+    def test_ota_psk_file_is_optional(self):
+        k = copy.deepcopy(self.k)
+        k["netz"].pop("ota_psk_datei", None)
+        cmd = knoten.provision_befehl(k, konfig.knoten_nach_name(k, "empf-1"), "p")
+        self.assertNotIn("--ota-psk-file", cmd)
+        k["netz"]["ota_psk_datei"] = "~/.spectra-ota-psk"
+        cmd = knoten.provision_befehl(k, konfig.knoten_nach_name(k, "empf-1"), "p")
+        self.assertTrue(cmd[cmd.index("--ota-psk-file") + 1].endswith(".spectra-ota-psk"))
+
     def test_sender_mode_filters_receivers_only(self):
         k = copy.deepcopy(self.k)
         k["link_modus"] = "sender"
